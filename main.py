@@ -1,42 +1,18 @@
 from bs4 import BeautifulSoup
-import requests
-from config import *
 
-def fetch_palylist_id(url) -> str:
-    """Extracts the playlist id from the url
-    Args:
-        url (str): The url of the playlist
-    Returns:
-        str: The playlist id
-    """ 
-    share_link = SHARE_LINK_URL.format(url)
-    # request the share link, and record the url after redeirection
-    response = requests.get(share_link, headers=HEADER, allow_redirects=False)
-    # trace until the final url
-    while response.status_code == 302 or response.status_code == 301:
-        print(response.headers["Location"])
-        response = requests.get(response.headers["Location"], headers=HEADER, allow_redirects=False)
-    
-    playlist_url = response.url
-    # extract the playlist id from the url
-    playlist_id = playlist_url.split("/")[-1]
-    # check if the playlist id is in number format
-    if playlist_id.isdigit():
-        return playlist_id
-    else:
-        return None
-    
+WEBPAGE_PATH = './webpage/playlist.html'
 
-def fetch_playlist_soup(id):
-    """Fetches the soup of the playlist page
+def fetch_playlist_soup():
+    """Fetches the soup of the playlist webpage
     Args:
-        id (str): The playlist id
+        None
     Returns:
         BeautifulSoup: The soup of the playlist page
     """
-    playlist_url = PLAYLIST_DETAIL_URL.format(id)
-    response = requests.get(playlist_url)
-    return BeautifulSoup(response.text, "html.parser")
+    # read the playlist webpage content form the file
+    with open(WEBPAGE_PATH, "r", encoding='utf8') as file:
+        content = file.read()
+    return BeautifulSoup(content, "html.parser")
 
 def analyse_playlist(soup):
     """Analyse the playlist and returns the list of musics
@@ -46,10 +22,26 @@ def analyse_playlist(soup):
         list: The list of musics
     """
     musics = []
-    for music in soup.find_all("a", class_="yt-simple-endpoint style-scope ytd-playlist-music-renderer"):
-        title = music.find("yt-formatted-string", class_="style-scope ytd-playlist-music-renderer").text
-        url = "https://www.youtube.com" + music["href"]
-        musics.append({"title": title, "url": url})
+    music_div_list = soup.find_all("div", class_="songlist__item c_b_normal")
+    for music in music_div_list:
+        # 1. 歌曲名称: songlist__name
+        name_span = music.find("span", class_="songlist__name")
+        name_a = name_span.find("a", class_="mod_songname__name")
+        name = name_a.text
+        # 2. 歌手列表：songlist__singer
+        single_span = music.find("span", class_="songlist__singer")
+        single_a_list = single_span.find_all("a", class_="singer_name")
+        singers = [single_a.text for single_a in single_a_list]
+        # 3. 所在专辑：songlist_album
+        album_span = music.find("span", class_="songlist__album")
+        album_a = album_span.find("a", class_="album_name")
+        album = album_a.text
+        musics.append({
+            "title": name,
+            "singers": singers,
+            "album": album
+        }
+        )
     return musics
 
 def generate_report(musics):
@@ -57,18 +49,40 @@ def generate_report(musics):
     Args:
         musics (list): The list of musics
     """
+    singer_count = {}
+    album_count = {}
     for music in musics:
-        print(f"Title: {music['title']}")
-        print(f"URL: {music['url']}")
-        print("\n")
+        for singer in music["singers"]:
+            singer_count[singer] = singer_count.get(singer, 0) + 1
+        if music["album"] != "":
+            album_count[music["album"]] = album_count.get(music["album"], 0) + 1
+    # 根据出现次数进行排序，得到元组
+    singer_count = sorted(singer_count.items(), key=lambda x: x[1], reverse=True)
+    album_count = sorted(album_count.items(), key=lambda x: x[1], reverse=True)
+
+    print("你的自建歌单分析报告")
+    print("=====================================")
+    print("在你的歌单里，现在还有{}首歌曲还可以畅听。".format(len(musics)))
+    print("=====================================")
+
+    singer_num = min(20, len(singer_count))
+    print("你最喜爱的{}位歌手是:".format(singer_num))
+    for singer, count in singer_count[:singer_num]:
+        print(f"{singer}: {count}首歌曲。")
+    
+    print("=====================================")
+    
+    album_num = min(20, len(album_count))
+    print("你最喜欢的{}张专辑是:".format(album_num))
+    for album, count in album_count[:album_num]:
+        print(f"{album}: {count}首歌曲。")
+
+    print("=====================================")
 
 if __name__ == "__main__":
-    playlist_id = fetch_palylist_id(PLAYLIST_TOKEN)
-    
-    if not playlist_id:
-        print("Invalid playlist token{}".format(PLAYLIST_TOKEN))
-        print("Please provide a valid playlist token and try again.")
+    soup = fetch_playlist_soup()
+    if not soup:
+        print("Invalid webpages file. Please provide a valid file and try again.")
         exit(1)
-    soup = fetch_playlist_soup(playlist_id)
     musics = analyse_playlist(soup)
     generate_report(musics)
