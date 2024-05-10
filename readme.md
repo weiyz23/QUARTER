@@ -44,7 +44,7 @@ https://y.qq.com/musicmac/v6/playlist/detail.html?id=<id:yyyyyy>
 
 - 在打开的网页中按下 `Ctrl+S`，选择以单个文件保存，保存为 `playlist.html`，放置在子目录`./webpage`下。
 
-![保存网页](Save.png)
+![保存网页](./figs/Save.png)
 
 - 运行 `main.py`：
 
@@ -56,6 +56,8 @@ python3 main.py
 
 现在的示例是一个我创建的简易歌单，已经放置在了webpage文件夹下。
 直接运行 `main.py`即可生成一个示例报告。
+
+![示例报告](./figs/Example.png)
 
 ## 备注
 
